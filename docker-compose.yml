@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   backend:
     container_name: backend
@@ -8,18 +10,32 @@ services:
       - CISO_ASSISTANT_URL=https://localhost:8443
       - DJANGO_DEBUG=True
       - AUTH_TOKEN_TTL=7200
+      - DJANGO_SUPERUSER_USERNAME=admin
+      - DJANGO_SUPERUSER_EMAIL=wael.hassine0@gmail.com
+      - DJANGO_SUPERUSER_PASSWORD=adminpassword123&
     volumes:
-      - ./db:/code/db
+      - ./db:/code/db # Persistent SQLite database storage
+      - ./docker-compose.sh:/docker-compose.sh # Mount your custom .sh script
+    entrypoint: >
+      bash -c "
+      if [ ! -f /code/db/ciso-assistant.sqlite3 ]; then
+        echo 'Database not found. Running initialization...';
+        chmod +x /docker-compose.sh &&
+        /docker-compose.sh;
+      else
+        echo 'Database already exists. Skipping initialization.';
+      fi
+      poetry run python manage.py runserver 0.0.0.0:8000"
 
   frontend:
     container_name: frontend
+    image: ghcr.io/intuitem/ciso-assistant-community/frontend:latest
+    restart: always
     environment:
       - PUBLIC_BACKEND_API_URL=http://backend:8000/api
       - PUBLIC_BACKEND_API_EXPOSED_URL=https://localhost:8443/api
       - PROTOCOL_HEADER=x-forwarded-proto
       - HOST_HEADER=x-forwarded-host
-
-    image: ghcr.io/intuitem/ciso-assistant-community/frontend:latest
     depends_on:
       - backend
 
@@ -32,11 +48,11 @@ services:
       - frontend
     restart: unless-stopped
     ports:
-      - 8443:8443
+      - "8443:8443"
     volumes:
       - ./caddy_data:/data
-    command: |
-      sh -c 'echo $$CISO_ASSISTANT_URL "{
-      reverse_proxy /api/* backend:8000
-      reverse_proxy /* frontend:3000
+    command: >
+      sh -c 'echo "${CISO_ASSISTANT_URL} {
+        reverse_proxy /api/* backend:8000
+        reverse_proxy /* frontend:3000
       }" > Caddyfile && caddy run'
