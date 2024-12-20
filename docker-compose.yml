@@ -1,13 +1,15 @@
+version: "3.8"
 services:
   backend:
     container_name: backend
-    image: ghcr.io/intuitem/ciso-assistant-community/backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     restart: always
     environment:
-      - ALLOWED_HOSTS=backend,localhost
-      - CISO_ASSISTANT_URL=https://localhost:8443
-      - DJANGO_DEBUG=True
-      - AUTH_TOKEN_TTL=7200
+      - ALLOWED_HOSTS=backend,localhost,srv673781.hstgr.cloud
+      - CISO_ASSISTANT_URL=https://srv673781.hstgr.cloud
+      - DJANGO_DEBUG=False
     volumes:
       - ./db:/code/db
 
@@ -15,11 +17,12 @@ services:
     container_name: frontend
     environment:
       - PUBLIC_BACKEND_API_URL=http://backend:8000/api
-      - PUBLIC_BACKEND_API_EXPOSED_URL=https://localhost:8443/api
+      - PUBLIC_BACKEND_API_EXPOSED_URL=https://srv673781.hstgr.cloud/api
       - PROTOCOL_HEADER=x-forwarded-proto
       - HOST_HEADER=x-forwarded-host
-
-    image: ghcr.io/intuitem/ciso-assistant-community/frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     depends_on:
       - backend
 
@@ -27,16 +30,16 @@ services:
     container_name: caddy
     image: caddy:2.8.4
     environment:
-      - CISO_ASSISTANT_URL=https://localhost:8443
-    depends_on:
-      - frontend
+      - CISO_ASSISTANT_URL=https://srv673781.hstgr.cloud
     restart: unless-stopped
     ports:
-      - 8443:8443
+      - "80:80" # Exposing port 80 for HTTP (automatic redirect to HTTPS)
+      - "443:443" # Exposing port 443 for HTTPS
     volumes:
-      - ./caddy_data:/data
+      - ./db:/data
     command: |
-      sh -c 'echo $$CISO_ASSISTANT_URL "{
-      reverse_proxy /api/* backend:8000
-      reverse_proxy /* frontend:3000
+      sh -c 'echo "srv673781.hstgr.cloud {
+        reverse_proxy /api/* backend:8000
+        reverse_proxy /* frontend:3000
+        tls youremail@example.com
       }" > Caddyfile && caddy run'
