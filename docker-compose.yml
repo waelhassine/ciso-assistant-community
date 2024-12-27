@@ -1,4 +1,5 @@
 version: "3.8"
+
 services:
   backend:
     container_name: backend
@@ -7,11 +8,11 @@ services:
       dockerfile: Dockerfile
     restart: always
     environment:
-      - ALLOWED_HOSTS=backend,localhost,srv673781.hstgr.cloud
+      - ALLOWED_HOSTS=srv673781.hstgr.cloud
       - CISO_ASSISTANT_URL=https://srv673781.hstgr.cloud
       - DJANGO_DEBUG=False
     volumes:
-      - ./db:/code/db
+      - backend_data:/code/db
 
   frontend:
     container_name: frontend
@@ -33,13 +34,15 @@ services:
       - CISO_ASSISTANT_URL=https://srv673781.hstgr.cloud
     restart: unless-stopped
     ports:
-      - "80:80" # Exposing port 80 for HTTP (automatic redirect to HTTPS)
-      - "443:443" # Exposing port 443 for HTTPS
+      - 8443:8443
     volumes:
-      - ./db:/data
+      - caddy_data:/data
     command: |
-      sh -c 'echo "srv673781.hstgr.cloud {
-        reverse_proxy /api/* backend:8000
-        reverse_proxy /* frontend:3000
-        tls youremail@example.com
-      }" > Caddyfile && caddy run'
+      sh -c 'echo srv673781.hstgr.cloud "{
+      reverse_proxy /api/* backend:8000
+      reverse_proxy /* frontend:3000
+      }" > /etc/caddy/Caddyfile && caddy run'
+
+volumes:
+  backend_data:
+  caddy_data:
